@@ -263,7 +263,7 @@ base = {
 }
 
 
-def add_extras(size, cfg, i, batch_norm=False):
+def add_extras(size, cfg, i, batch_norm=False):  # i=1024
     # Extra layers added to VGG for feature scaling
     layers = []
     in_channels = i
@@ -306,12 +306,12 @@ def multibox(size, vgg, extra_layers, cfg, num_classes):
             loc_layers += [nn.Conv2d(512,
                                  cfg[k] * 4, kernel_size=3, padding=1)]
             conf_layers +=[nn.Conv2d(512,
-                                 cfg[k] * num_classes, kernel_size=3, padding=1)]
+                                 cfg[k] * (num_classes + 1), kernel_size=3, padding=1)]   # add Iou
         else:
             loc_layers += [nn.Conv2d(vgg[v].out_channels,
                                  cfg[k] * 4, kernel_size=3, padding=1)]
             conf_layers += [nn.Conv2d(vgg[v].out_channels,
-                        cfg[k] * num_classes, kernel_size=3, padding=1)]
+                        cfg[k] * (num_classes+1), kernel_size=3, padding=1)]  # add Iou
     i = 1
     indicator = 0
     if size == 300:
@@ -327,7 +327,7 @@ def multibox(size, vgg, extra_layers, cfg, num_classes):
             loc_layers += [nn.Conv2d(v.out_channels, cfg[i]
                                  * 4, kernel_size=3, padding=1)]
             conf_layers += [nn.Conv2d(v.out_channels, cfg[i]
-                                  * num_classes, kernel_size=3, padding=1)]
+                                  * (num_classes+1), kernel_size=3, padding=1)] # add IoU
             i +=1
     return vgg, extra_layers, (loc_layers, conf_layers)
 
