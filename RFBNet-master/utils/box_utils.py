@@ -1,3 +1,4 @@
+#coding:utf-8
 import torch
 import torch.nn as nn
 import math
@@ -83,6 +84,22 @@ def matrix_iou(a,b):
     area_b = np.prod(b[:, 2:] - b[:, :2], axis=1)
     return area_i / (area_a[:, np.newaxis] + area_b - area_i)
 
+def matrix_iou_torch(a, b, priors, variances):
+    """
+    return iou of a and b, numpy version for data augenmentation
+    """
+    a = decode(a, priors, variances)
+    b = decode(b, priors, variances)
+    lt = torch.max(a[:, :2], b[:, :2])
+    rb = torch.min(a[:, 2:], b[:, 2:])
+
+    inter = torch.clamp((rb - lt), min=0)
+    inter_union = inter[:, 0] * inter[:, 1]
+    area_a = (a[:, 2] - a[:, 0]) * (a[:, 3] - a[:, 1])
+    area_b = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
+    union = area_a + area_b - inter_union
+    iou = inter_union / union
+    return iou
 
 def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
     """Match each prior box with the ground truth box of the highest jaccard
@@ -125,6 +142,7 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
     conf[best_truth_overlap < threshold] = 0  # label as background
     loc = encode(matches, priors, variances)
     loc_t[idx] = loc    # [num_priors,4] encoded offsets to learn
+    # print("111111 ", loc)
     conf_t[idx] = conf  # [num_priors] top class label for each prior
 
 def encode(matched, priors, variances):
@@ -141,12 +159,14 @@ def encode(matched, priors, variances):
     """
 
     # dist b/t match center and prior's center
+    # print(matched)
     g_cxcy = (matched[:, :2] + matched[:, 2:])/2 - priors[:, :2]
     # encode variance
     g_cxcy /= (variances[0] * priors[:, 2:])
     # match wh / prior wh
     g_wh = (matched[:, 2:] - matched[:, :2]) / priors[:, 2:]
-    g_wh = torch.log(g_wh) / variances[1]
+    # print(g_wh, variances)
+    g_wh = torch.log(g_wh+1e-10) / variances[1]
     # return target for smooth_l1_loss
     return torch.cat([g_cxcy, g_wh], 1)  # [num_priors,4]
 
@@ -171,7 +191,7 @@ def encode_multi(matched, priors, offsets, variances):
     g_cxcy.div_(variances[0] * offsets[:, 2:])
     # match wh / prior wh
     g_wh = (matched[:, 2:] - matched[:, :2]) / priors[:, 2:]
-    g_wh = torch.log(g_wh) / variances[1]
+    g_wh = torch.log(g_wh+1e-10) / variances[1]
     # return target for smooth_l1_loss
     return torch.cat([g_cxcy, g_wh], 1)  # [num_priors,4]
 

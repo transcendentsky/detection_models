@@ -10,8 +10,8 @@ import torchvision.transforms as transforms
 import numpy as np
 from torch.autograd import Variable
 from data import VOCroot,COCOroot 
-from data import AnnotationTransform,  VOCDetection, BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
-# COCODetection
+from data import AnnotationTransform, COCODetection, VOCDetection, BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
+
 import torch.utils.data as data
 from layers.functions import Detect,PriorBox
 from utils.nms_wrapper import nms
@@ -25,7 +25,7 @@ parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO version')
-parser.add_argument('-m', '--trained_model', default='ckpts/RFB300_80_5.pth',
+parser.add_argument('-m', '--trained_model', default='ckpts/RFBNet300_VOC_80_7.pth',
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='Dir to save results')
@@ -130,9 +130,9 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
 
         nms_time = _t['misc'].toc()
 
-        if i % 20 == 0:
+        if i % 2 == 0:
             print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s'
-                .format(i + 1, num_images, detect_time, nms_time))
+                .format(i + 1, num_images, detect_time, nms_time), end='\r')
             _t['im_detect'].clear()
             _t['misc'].clear()
 
@@ -143,12 +143,12 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
     testset.evaluate_detections(all_boxes, save_folder)
 
 
-if __name__ == '__main__':
+def test_model(trained_model):
     # load net
     img_dim = (300,512)[args.size=='512']
     num_classes = (21, 81)[args.dataset == 'COCO']
     net = build_net('test', img_dim, num_classes)    # initialize detector
-    state_dict = torch.load(args.trained_model)
+    state_dict = torch.load(trained_model)
     # create new OrderedDict that does not contain `module.`
 
     from collections import OrderedDict
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     net.load_state_dict(new_state_dict)
     net.eval()
     print('Finished loading model!')
-    print(net)
+    # print(net)
     # load data
     if args.dataset == 'VOC':
         testset = VOCDetection(
@@ -188,3 +188,34 @@ if __name__ == '__main__':
     test_net(save_folder, net, detector, args.cuda, testset,
              BaseTransform(net.size, rgb_means, (2, 0, 1)),
              top_k, thresh=0.01)
+
+if __name__ == '__main__':
+    for i in range(15,29):
+        fname = "weights/mixup/RFB_vgg_VOC_epoches_" + str(i) + "0.pth"
+        print( fname)
+        test_model(fname)
+
+"""
+original
+0.850
+0.861
+0.777
+0.757
+0.606
+0.889
+0.876
+0.868
+0.642
+0.853
+0.779
+0.861
+0.890
+0.871
+0.822
+0.587
+0.815
+0.811
+0.882
+0.815
+mAP=0.806
+"""

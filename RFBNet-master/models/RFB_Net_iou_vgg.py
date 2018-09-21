@@ -211,12 +211,12 @@ class RFBNet(nn.Module):
 
         if self.phase == "test":
             output = (
-                loc.view(loc.size(0), -1, 4),                   # loc preds
+                loc.view(loc.size(0), -1, 4+1),                   # loc preds
                 self.softmax(conf.view(-1, self.num_classes)),  # conf preds
             )
         else:
             output = (
-                loc.view(loc.size(0), -1, 4),
+                loc.view(loc.size(0), -1, 4+1),
                 conf.view(conf.size(0), -1, self.num_classes),
             )
         return output
@@ -304,14 +304,14 @@ def multibox(size, vgg, extra_layers, cfg, num_classes):
     for k, v in enumerate(vgg_source):
         if k == 0:
             loc_layers += [nn.Conv2d(512,
-                                 cfg[k] * 4, kernel_size=3, padding=1)]
+                                 cfg[k] * (4+1), kernel_size=3, padding=1)]
             conf_layers +=[nn.Conv2d(512,
-                                 cfg[k] * (num_classes + 1), kernel_size=3, padding=1)]   # add Iou
+                                 cfg[k] * (num_classes), kernel_size=3, padding=1)]   # add Iou
         else:
             loc_layers += [nn.Conv2d(vgg[v].out_channels,
-                                 cfg[k] * 4, kernel_size=3, padding=1)]
+                                 cfg[k] * (4+1), kernel_size=3, padding=1)]
             conf_layers += [nn.Conv2d(vgg[v].out_channels,
-                        cfg[k] * (num_classes+1), kernel_size=3, padding=1)]  # add Iou
+                        cfg[k] * (num_classes), kernel_size=3, padding=1)]  # add Iou
     i = 1
     indicator = 0
     if size == 300:
@@ -325,9 +325,9 @@ def multibox(size, vgg, extra_layers, cfg, num_classes):
     for k, v in enumerate(extra_layers):
         if k < indicator or k%2== 0:
             loc_layers += [nn.Conv2d(v.out_channels, cfg[i]
-                                 * 4, kernel_size=3, padding=1)]
+                                 * (4 + 1), kernel_size=3, padding=1)]
             conf_layers += [nn.Conv2d(v.out_channels, cfg[i]
-                                  * (num_classes+1), kernel_size=3, padding=1)] # add IoU
+                                  * (num_classes), kernel_size=3, padding=1)] # add IoU
             i +=1
     return vgg, extra_layers, (loc_layers, conf_layers)
 
@@ -338,6 +338,9 @@ mbox = {
 
 
 def build_net(phase, size=300, num_classes=21):
+    print("------------------------------------\n"
+          "        RFB IOU NET vgg \n"
+          "------------------------------------\n")
     if phase != "test" and phase != "train":
         print("Error: Phase not recognized")
         return

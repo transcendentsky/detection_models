@@ -1,3 +1,4 @@
+#coding:utf-8
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -110,6 +111,7 @@ class MultiBoxLoss(nn.Module):
         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
 
         N = max(num_pos.data.sum().float(), 1)
+        # N = max(num_pos.data.sum(), 1)
         loss_l/=N
         loss_c/=N
         return loss_l,loss_c

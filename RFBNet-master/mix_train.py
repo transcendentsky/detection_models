@@ -11,11 +11,12 @@ import argparse
 import numpy as np
 from torch.autograd import Variable
 import torch.utils.data as data
-from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, COCODetection, VOCDetection, detection_collate, BaseTransform, preproc
+from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
+    COCODetection, VOCDetection, detection_collate, BaseTransform, preproc
 from layers.modules import MultiBoxLoss
 from layers.functions import PriorBox
 import time
-
+from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
@@ -37,13 +38,15 @@ parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
 parser.add_argument('--ngpu', default=1, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
-                    default=4e-3, type=float, help='initial learning rate')
+                    default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument(
-    '--resume_net', default=None, help='resume net for retraining')
+
+parser.add_argument('--resume_net', default="ckpts/RFBNet300_VOC_80_7.pth",
+                    help='resume net for retraining')
 parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
-parser.add_argument('-max','--max_epoch', default=300,
+
+parser.add_argument('-max', '--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
 parser.add_argument('--weight_decay', default=5e-4,
                     type=float, help='Weight decay for SGD')
@@ -51,10 +54,9 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-parser.add_argument('--save_folder', default='./weights/',
+parser.add_argument('--save_folder', default='./weights/mixup/',
                     help='Location to save checkpoint models')
 args = parser.parse_args()
-
 
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
@@ -63,7 +65,7 @@ if args.dataset == 'VOC':
     train_sets = [('2007', 'trainval'), ('2012', 'trainval')]
     cfg = (VOC_300, VOC_512)[args.size == '512']
 else:
-    train_sets = [('2014', 'train'),('2014', 'valminusminival')]
+    train_sets = [('2014', 'train'), ('2014', 'valminusminival')]
     cfg = (COCO_300, COCO_512)[args.size == '512']
 
 if args.version == 'RFB_vgg':
@@ -72,19 +74,21 @@ elif args.version == 'RFB_E_vgg':
     from models.RFB_Net_E_vgg import build_net
 elif args.version == 'RFB_mobile':
     from models.RFB_Net_mobile import build_net
+
     cfg = COCO_mobile_300
 else:
     print('Unkown version!')
 
-img_dim = (300,512)[args.size=='512']
-rgb_means = ((104, 117, 123),(103.94,116.78,123.68))[args.version == 'RFB_mobile']
-p = (0.6,0.2)[args.version == 'RFB_mobile']
+img_dim = (300, 512)[args.size == '512']
+rgb_means = ((104, 117, 123), (103.94, 116.78, 123.68))[args.version == 'RFB_mobile']
+p = (0.6, 0.2)[args.version == 'RFB_mobile']
 num_classes = (21, 81)[args.dataset == 'COCO']
 batch_size = args.batch_size
 weight_decay = 0.0005
 gamma = 0.1
 momentum = 0.9
 
+writer = SummaryWriter("logs/mixup/")
 net = build_net('train', img_dim, num_classes)
 # print(net)
 if args.resume_net == None:
@@ -92,8 +96,10 @@ if args.resume_net == None:
     print('Loading base network...')
     net.base.load_state_dict(base_weights)
 
+
     def xavier(param):
-        init.xavier_uniform(param)
+        init.xavier_uniform_(param)
+
 
     def weights_init(m):
         for key in m.state_dict():
@@ -105,8 +111,9 @@ if args.resume_net == None:
             elif key.split('.')[-1] == 'bias':
                 m.state_dict()[key][...] = 0
 
+
     print('Initializing weights...')
-# initialize newly added layers' weights with kaiming_normal method
+    # initialize newly added layers' weights with kaiming_normal method
     net.extras.apply(weights_init)
     net.loc.apply(weights_init)
     net.conf.apply(weights_init)
@@ -116,16 +123,17 @@ if args.resume_net == None:
         net.up_reduce.apply(weights_init)
 
 else:
-# load resume network
-    print('Loading resume network...')
+    # load resume network
+    print('Loading resume network... {}'.format(args.resume_net))
     state_dict = torch.load(args.resume_net)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
+
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         head = k[:7]
         if head == 'module.':
-            name = k[7:] # remove `module.`
+            name = k[7:]  # remove `module.`
         else:
             name = k
         new_state_dict[name] = v
@@ -138,10 +146,9 @@ if args.cuda:
     net.cuda()
     cudnn.benchmark = True
 
-
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=args.momentum, weight_decay=args.weight_decay)
-#optimizer = optim.RMSprop(net.parameters(), lr=args.lr,alpha = 0.9, eps=1e-08,
+# optimizer = optim.RMSprop(net.parameters(), lr=args.lr,alpha = 0.9, eps=1e-08,
 #                      momentum=args.momentum, weight_decay=args.weight_decay)
 
 criterion = MultiBoxLoss(num_classes, 0.5, True, 0, True, 3, 0.5, False)
@@ -150,7 +157,6 @@ with torch.no_grad():
     priors = priorbox.forward()
     if args.cuda:
         priors = priors.cuda()
-
 
 
 def train():
@@ -176,8 +182,8 @@ def train():
 
     stepvalues_VOC = (150 * epoch_size, 200 * epoch_size, 250 * epoch_size)
     stepvalues_COCO = (90 * epoch_size, 120 * epoch_size, 140 * epoch_size)
-    stepvalues = (stepvalues_VOC,stepvalues_COCO)[args.dataset=='COCO']
-    print('Training',args.version, 'on', dataset.name)
+    stepvalues = (stepvalues_VOC, stepvalues_COCO)[args.dataset == 'COCO']
+    print('Training', args.version, 'on', dataset.name)
     step_index = 0
 
     if args.resume_epoch > 0:
@@ -186,28 +192,35 @@ def train():
         start_iter = 0
 
     lr = args.lr
+    loc_loss = 0
+    conf_loss = 0
     for iteration in range(start_iter, max_iter):
         if iteration % epoch_size == 0:
             # create batch iterator
             batch_iterator = iter(data.DataLoader(dataset, batch_size,
-                                                  shuffle=True, num_workers=args.num_workers, collate_fn=detection_collate))
+                                                  shuffle=True, num_workers=args.num_workers,
+                                                  collate_fn=detection_collate))
             loc_loss = 0
             conf_loss = 0
-            if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 ==0 and epoch > 200):
-                torch.save(net.state_dict(), args.save_folder+args.version+'_'+args.dataset + '_epoches_'+
+            if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > 200):
+                torch.save(net.state_dict(), args.save_folder + args.version + '_' + args.dataset + '_epoches_' +
                            repr(epoch) + '.pth')
             epoch += 1
+
 
         load_t0 = time.time()
         if iteration in stepvalues:
             step_index += 1
         lr = adjust_learning_rate(optimizer, args.gamma, epoch, step_index, iteration, epoch_size)
 
-
-        # load train data
         images, targets = next(batch_iterator)
-        
-        #print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
+        # load train data
+        lam = np.random.beta(0.1, 0.1)
+        ##  mixup
+        index = np.arange(len(targets))
+        np.random.shuffle(index)
+
+        # print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
 
         if args.cuda:
             images = Variable(images.cuda())
@@ -215,12 +228,23 @@ def train():
         else:
             images = Variable(images)
             targets = [Variable(anno) for anno in targets]
+        mixed_x = lam * images + (1 - lam) * images[index, :]
+        y_a = targets
+        y_b = [targets[idx] for idx in index]
+
         # forward
         t0 = time.time()
-        out = net(images)
+        out = net(mixed_x)
         # backprop
         optimizer.zero_grad()
-        loss_l, loss_c = criterion(out, priors, targets)
+        # loss_l, loss_c = criterion(out, priors, targets)
+
+        loss_l1, loss_c1 = criterion(out,priors, y_a)
+        loss_l2, loss_c2 = criterion(out,priors, y_b)
+
+        loss_l = lam * loss_l1 + (1 - lam) * loss_l2
+        loss_c = lam * loss_c1 + (1 - lam) * loss_c2
+
         loss = loss_l + loss_c
         loss.backward()
         optimizer.step()
@@ -232,20 +256,25 @@ def train():
             print('Epoch:' + repr(epoch) + ' || epochiter: ' + repr(iteration % epoch_size) + '/' + repr(epoch_size)
                   + '|| Totel iter ' +
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
-                loss_l.item(),loss_c.item()) + 
-                'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
+                      loss_l.item(), loss_c.item()) +
+                  'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
+        if iteration % epoch_size == 0:
+            # Summary
+            writer.add_scalar("conf_loss", conf_loss, iteration//epoch_size)
+            writer.add_scalar("loc_loss", loc_loss, iteration//epoch_size)
+            writer.add_scalar("learning rate", lr, iteration//epoch_size)
 
     torch.save(net.state_dict(), args.save_folder +
-               'Final_' + args.version +'_' + args.dataset+ '.pth')
+               'Final_' + args.version + '_' + args.dataset + '.pth')
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
-    """Sets the learning rate 
+    """Sets the learning rate
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
     if epoch < 6:
-        lr = 1e-6 + (args.lr-1e-6) * iteration / (epoch_size * 5) 
+        lr = 1e-6 + (args.lr - 1e-6) * iteration / (epoch_size * 5)
     else:
         lr = args.lr * (gamma ** (step_index))
     for param_group in optimizer.param_groups:

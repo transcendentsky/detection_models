@@ -147,7 +147,7 @@ class RFBNet(nn.Module):
             print("Error: Sorry only SSD300 and SSD512 are supported!")
             return
         # vgg network
-        self.base = nn.ModuleList(base)  # *multibox(size, vgg(base[str(size)]
+        self.base = nn.ModuleList(base)
         # conv_4
         self.Norm = BasicRFB_a(512,512,stride = 1,scale=1.0)
         self.extras = nn.ModuleList(extras)
@@ -183,7 +183,7 @@ class RFBNet(nn.Module):
 
         # apply vgg up to conv4_3 relu
         for k in range(23):
-            x = self.base[k](x)  # *multibox(size, vgg(base[str(size)]
+            x = self.base[k](x)
 
         s = self.Norm(x)
         sources.append(s)
@@ -345,10 +345,6 @@ def build_net(phase, size=300, num_classes=21):
         print("Error: Sorry only RFBNet300 and RFBNet512 are supported!")
         return
 
-    return RFBNet(phase, size, *multibox(size, vgg=vgg(base[str(size)], 3),
-                                extra_layers=add_extras(size, extras[str(size)], 1024),
-                                cfg=mbox[str(size)], num_classes=num_classes), num_classes)
-
-if __name__ == "__main__":
-    net = build_net('train')
-    print(net)
+    return RFBNet(phase, size, *multibox(size, vgg(base[str(size)], 3),
+                                add_extras(size, extras[str(size)], 1024),
+                                mbox[str(size)], num_classes), num_classes=num_classes)

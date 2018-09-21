@@ -1,3 +1,4 @@
+from __future__ import division
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
