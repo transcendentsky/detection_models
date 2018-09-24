@@ -19,7 +19,7 @@ from utils.timer import Timer
 
 parser = argparse.ArgumentParser(description='Receptive Field Block Net')
 
-parser.add_argument('-v', '--version', default='RFB_vgg',
+parser.add_argument('-v', '--version', default='RFB_iou_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
@@ -49,6 +49,8 @@ if args.version == 'RFB_vgg':
     from models.RFB_Net_vgg import build_net
 elif args.version == 'RFB_E_vgg':
     from models.RFB_Net_E_vgg import build_net
+elif args.version == "RFB_iou_vgg":
+    from models.RFB_Net_iou_vgg import build_net
 elif args.version == 'RFB_mobile':
     from models.RFB_Net_mobile import build_net
     cfg = COCO_mobile_300
@@ -190,8 +192,8 @@ def test_model(trained_model):
              top_k, thresh=0.01)
 
 if __name__ == '__main__':
-    for i in range(15,29):
-        fname = "weights/mixup/RFB_vgg_VOC_epoches_" + str(i) + "0.pth"
+    for i in range(24,29):
+        fname = "./results/test/IOURFB_iou_vgg_VOC_epoches_" + str(i) + "0.pth"
         print( fname)
         test_model(fname)
 

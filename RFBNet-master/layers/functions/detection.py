@@ -30,8 +30,11 @@ class Detect(Function):
         """
 
         loc, conf = predictions
-
-        loc_data = loc.data
+        if loc.size(2) > 4:               # Return IoU
+            loc_data = loc[:,:,:-1].data
+            iou_data = loc[:,:,-1].data
+        else:
+            loc_data = loc.data
         conf_data = conf.data
         prior_data = prior.data
         num = loc_data.size(0)  # batch size

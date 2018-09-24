@@ -54,7 +54,7 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-parser.add_argument('--save_folder', default='./weights/mixup/',
+parser.add_argument('--save_folder', default='./weights/mixup005/',
                     help='Location to save checkpoint models')
 args = parser.parse_args()
 
@@ -88,7 +88,7 @@ weight_decay = 0.0005
 gamma = 0.1
 momentum = 0.9
 
-writer = SummaryWriter("logs/mixup/")
+writer = SummaryWriter("logs/mixup005/")
 net = build_net('train', img_dim, num_classes)
 # print(net)
 if args.resume_net == None:
@@ -215,7 +215,7 @@ def train():
 
         images, targets = next(batch_iterator)
         # load train data
-        lam = np.random.beta(0.1, 0.1)
+        lam = np.random.beta(0.05, 0.05)
         ##  mixup
         index = np.arange(len(targets))
         np.random.shuffle(index)
