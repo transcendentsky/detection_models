@@ -2,4 +2,9 @@
 *events*
 *.pyc
 *.idea*
-*/results
+*results
+*events*
+
+*.pkl
+*.spyproject*
+*.ini
