@@ -17,7 +17,6 @@ import torch.utils.data as data
 import numpy as np
 import argparse
 from tensorboardX import SummaryWriter
-from tqdm import tqdm
 from torch.optim import lr_scheduler
 
 def str2bool(v):
@@ -27,7 +26,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
 train_set = parser.add_mutually_exclusive_group()
-parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
+parser.add_argument('--dataset', default='COCO', choices=['VOC', 'COCO'],
                     type=str, help='VOC or COCO')
 parser.add_argument('--dataset_root', default=VOC_ROOT,
                     help='Dataset root directory path')
@@ -35,8 +34,8 @@ parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
 parser.add_argument('--batch_size', default=32, type=int,
                     help='Batch size for training')
-## # training from trained
-parser.add_argument('--resume', default='weights/ssd300_mAP_77.43_v2.pth', type=str,
+## # training from trained # 'weights/ssd300_mAP_77.43_v2.pth'
+parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
@@ -47,7 +46,7 @@ parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
 
 ### decreased the learning rate
-parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,
+parser.add_argument('--lr', '--learning-rate', default=4e-3, type=float,
                     help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float,
                     help='Momentum value for optim')
@@ -77,7 +76,6 @@ if not os.path.exists(args.save_folder):
 writer = None
 lr_sche = None
 log_folder = None
-COCO_ROOT = None
 
 def train():
     if args.dataset == 'COCO':
@@ -136,7 +134,7 @@ def train():
     sche = lr_scheduler.CosineAnnealingLR(optimizer, T_max=250)
 
     # initSummaty()
-    log_folder = './results/' + net.__class__.__name__ + '/' + 'mixup005' + '/' + str(1002) + '/'
+    log_folder = './results/' + net.__class__.__name__ + '/' + 'mixupCOCO' + '/' + str(1002) + '/'
     print("log_folder:  ", log_folder)
     writer = SummaryWriter(log_folder)
 
@@ -184,7 +182,7 @@ def train():
             lr = adjust_learning_rate_wr(optimizer, 0.1, step_index, iteration+(epoch_size*epoch), epoch,epoch_size)
 
             ### mixing
-            alpha = 0.05
+            alpha = 0.1
             lam = np.random.beta(alpha, alpha)
             index = np.arange(len(targets))
             np.random.shuffle(index)

@@ -19,11 +19,11 @@ from utils.timer import Timer
 
 parser = argparse.ArgumentParser(description='Receptive Field Block Net')
 
-parser.add_argument('-v', '--version', default='RFB_iou_vgg',
+parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
 parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
-parser.add_argument('-d', '--dataset', default='VOC',
+parser.add_argument('-d', '--dataset', default='VOC2012',
                     help='VOC or COCO version')
 parser.add_argument('-m', '--trained_model', default='ckpts/RFBNet300_VOC_80_7.pth',
                     type=str, help='Trained state_dict file path to open')
@@ -49,6 +49,8 @@ if args.version == 'RFB_vgg':
     from models.RFB_Net_vgg import build_net
 elif args.version == 'RFB_E_vgg':
     from models.RFB_Net_E_vgg import build_net
+elif args.version == "RFB_MNet_vgg":
+    from models.RFB_MNet_vgg import build_net
 elif args.version == "RFB_iou_vgg":
     from models.RFB_Net_iou_vgg import build_net
 elif args.version == 'RFB_mobile':
@@ -170,6 +172,9 @@ def test_model(trained_model):
     if args.dataset == 'VOC':
         testset = VOCDetection(
             VOCroot, [('2007', 'test')], None, AnnotationTransform())
+    elif args.dataset == 'VOC2012':
+        testset = VOCDetection(
+            VOCroot, [('2012', 'test')], None, AnnotationTransform())
     elif args.dataset == 'COCO':
         testset = COCODetection(
             COCOroot, [('2014', 'minival')], None)
@@ -192,9 +197,14 @@ def test_model(trained_model):
              top_k, thresh=0.01)
 
 if __name__ == '__main__':
+    tt = "ckpts/RFBNet300_VOC_80_7.pth"
+    test_model(tt)
+
+
     for i in range(24,29):
-        fname = "./results/test/IOURFB_iou_vgg_VOC_epoches_" + str(i) + "0.pth"
-        print( fname)
+        fname = "weights/mixup/RFB_vgg_VOC_epoches_2" + str(i) + "0.pth"
+        # "results/mtensor/1001RFB_vgg_VOC_epoches_30.pth"
+        print(fname)
         test_model(fname)
 
 """

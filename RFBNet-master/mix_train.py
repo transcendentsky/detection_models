@@ -22,7 +22,8 @@ parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
 parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
-parser.add_argument('-s', '--size', default='300',
+# ======================================================================== #
+parser.add_argument('-s', '--size', default='512',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO dataset')
@@ -40,9 +41,10 @@ parser.add_argument('--ngpu', default=1, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
                     default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-
-parser.add_argument('--resume_net', default="ckpts/RFBNet300_VOC_80_7.pth",
+# ========================================================================= #
+parser.add_argument('--resume_net', default=None,
                     help='resume net for retraining')
+# "ckpts/RFBNet300_VOC_80_7.pth"
 parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 
@@ -54,7 +56,7 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-parser.add_argument('--save_folder', default='./weights/mixup005/',
+parser.add_argument('--save_folder', default='./weights/mixup/512',
                     help='Location to save checkpoint models')
 args = parser.parse_args()
 
@@ -88,7 +90,7 @@ weight_decay = 0.0005
 gamma = 0.1
 momentum = 0.9
 
-writer = SummaryWriter("logs/mixup005/")
+writer = SummaryWriter("logs/mixup/512")
 net = build_net('train', img_dim, num_classes)
 # print(net)
 if args.resume_net == None:
@@ -215,7 +217,7 @@ def train():
 
         images, targets = next(batch_iterator)
         # load train data
-        lam = np.random.beta(0.05, 0.05)
+        lam = np.random.beta(0.1, 0.1)
         ##  mixup
         index = np.arange(len(targets))
         np.random.shuffle(index)
