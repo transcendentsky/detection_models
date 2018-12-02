@@ -432,6 +432,8 @@ def main(trained_model):
     dataset = VOCDetection(args.voc_root, [('2007', set_type)],
                            BaseTransform(300, dataset_mean),
                            VOCAnnotationTransform())
+    dataset = COCO
+
     if args.cuda:
         net = net.cuda()
         cudnn.benchmark = True

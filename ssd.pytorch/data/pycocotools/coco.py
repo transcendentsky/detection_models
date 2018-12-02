@@ -226,6 +226,8 @@ class COCO:
         :return: imgs (object array) : loaded img objects
         """
         if _isArrayLike(ids):
+            print("[DEBUG] Load ???")
+            print("The value is ? = ", ids)
             return [self.imgs[id] for id in ids]
         elif type(ids) == int:
             return [self.imgs[ids]]

@@ -95,7 +95,6 @@ def test_voc(trained_model):
 
 if __name__ == '__main__':
     for i in range(10):
-        iii = i + 20
-        pth = "results/DataParallel/mixup005/1002/ssd300_VOC_" + str(iii) + "0.pth"
+        pth = "results/DataParallel/mixupCOCO/1002/ssd300_COCO_" + str(i+150) + ".pth"
         print(pth)
         test_voc(pth)

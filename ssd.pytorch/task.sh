@@ -1,0 +1,1 @@
+python mix_train.py --start_iter 129 --resume "results/DataParallel/mixupCOCO/1002/ssd300_COCO_129.pth"

@@ -93,10 +93,15 @@ class MultiBoxLoss(nn.Module):
         loc_p = loc_data[pos_idx].view(-1, 4)
         loc_t = loc_t[pos_idx].view(-1, 4)
         loss_l = F.smooth_l1_loss(loc_p, loc_t, size_average=False)
+        # Avoid over stack
+        loss_l = torch.clamp(loss_l, min=-9999.0, max=9999.0)
 
         # Compute max conf across batch for hard negative mining
         batch_conf = conf_data.view(-1, self.num_classes)
         loss_c = log_sum_exp(batch_conf) - batch_conf.gather(1, conf_t.view(-1, 1))
+
+        # Avoid over stack
+        loss_c = torch.clamp(loss_c, min=-9999.0, max=9999.0)
 
         # Hard Negative Mining
         loss_c[pos.view(-1,1)] = 0  # filter out pos boxes for now

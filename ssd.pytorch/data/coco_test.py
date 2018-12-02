@@ -18,10 +18,12 @@ import numpy as np
 import json
 import uuid
 
-from utils.pycocotools.coco import COCO
-from utils.pycocotools.cocoeval import COCOeval
-from utils.pycocotools import mask as COCOmask
-
+# from utils.pycocotools.coco import COCO
+# from utils.pycocotools.cocoeval import COCOeval
+# from utils.pycocotools import mask as COCOmask
+from data.pycocotools.coco import COCO
+from data.pycocotools.cocoeval import COCOeval
+from data.pycocotools import mask as COCOmask
 
 class COCODetection(data.Dataset):
 
@@ -57,13 +59,14 @@ class COCODetection(data.Dataset):
             'test-dev2015' : 'test2015',
         }
 
+
         for (year, image_set) in image_sets:
             coco_name = image_set+year
             data_name = (self._view_map[coco_name]
                         if coco_name in self._view_map
                         else coco_name)
             annofile = self._get_ann_file(coco_name)
-            print("Loading annofile: ", annofile)
+            print("[DEBUG] annofile name: ", annofile)
             _COCO = COCO(annofile)
             self._COCO = _COCO
             self.coco_name = coco_name
@@ -80,9 +83,41 @@ class COCODetection(data.Dataset):
                 print('test set will not load annotations!')
             else:
                 self.annotations.extend(self._load_coco_annotations(coco_name, indexes,_COCO))
-            print("Dataset Length: ", len(self.ids))
+
+        self.coco = self._COCO
 
 
+    def pull_item(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: Tuple (image, target, height, width).
+                   target is the object returned by ``coco.loadAnns``.
+        """
+        img_id = self.ids[index]
+        ann_ids = self.coco.getAnnIds(imgIds=index)
+        print(ann_ids)
+        target = self.coco.loadAnns(ann_ids)
+        print("# ------------------ #")
+        print(target)
+
+        path = img_id
+        # print("[DEBUG] path= ", path)
+        assert os.path.exists(path), 'Image path does not exist: {}'.format(path)
+        img = cv2.imread(os.path.join(self.root, path))
+        height, width, _ = img.shape
+        if self.target_transform is not None:
+            target = self.target_transform(target, width, height)
+        if self.transform is not None:
+            target = np.array(target)
+            img, boxes, labels = self.transform(img, target[:, :4],
+                                                target[:, 4])
+            # to rgb
+            img = img[:, :, (2, 1, 0)]
+
+            target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
 
     def image_path_from_index(self, name, index):
         """
@@ -108,7 +143,6 @@ class COCODetection(data.Dataset):
 
     def _load_coco_annotations(self, coco_name, indexes, _COCO):
         cache_file=os.path.join(self.cache_path,coco_name+'_gt_roidb.pkl')
-        print("Cache file: ", cache_file)
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb = pickle.load(fid)
@@ -174,14 +208,22 @@ class COCODetection(data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-
         if self.preproc is not None:
-            img, target = self.preproc(img, target)
+            # img, target = self.preproc(img, target)
 
-                    # target = self.target_transform(target, width, height)
+            target = np.array(target)
+            img, boxes, labels = self.preproc(img, target[:, :4], target[:, 4])
+            # to rgb
+            img = img[:, :, (2, 1, 0)]
+            # img = img.transpose(2, 0, 1)
+            target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+
+        # target = self.target_transform(target, width, height)
         #print(target.shape)
 
-        return img, target
+
+        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
+        # return img, target
 
     def __len__(self):
         return len(self.ids)
@@ -263,6 +305,12 @@ class COCODetection(data.Dataset):
     def _coco_results_one_category(self, boxes, cat_id):
         results = []
         for im_ind, index in enumerate(self.image_indexes):
+            # if boxes[im_ind] == None or boxes[im_ind] == []:
+            #     continue
+            if len(boxes[im_ind]) == 0:
+                continue
+            print("DEBUG -----------")
+            print(boxes[im_ind])
             dets = boxes[im_ind].astype(np.float)
             if dets == []:
                 continue
@@ -285,6 +333,7 @@ class COCODetection(data.Dataset):
         #   "score": 0.236}, ...]
         results = []
         for cls_ind, cls in enumerate(self._classes):
+            print("DEBUG: cls_ind cls: ", cls_ind, cls)
             if cls == '__background__':
                 continue
             print('Collecting {} results ({:d}/{:d})'.format(cls, cls_ind,
@@ -314,6 +363,5 @@ class COCODetection(data.Dataset):
         # Only do evaluation on non-test sets
         if self.coco_name.find('test') == -1:
             self._do_detection_eval(res_file, output_dir)
-        # self._do_detection_eval(res_file, output_dir)
         # Optionally cleanup results json file
 

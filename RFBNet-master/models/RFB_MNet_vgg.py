@@ -44,8 +44,8 @@ class BasicRFB(nn.Module):
                 )
         self.branch1_2 = nn.Sequential(
                 BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
-                BasicConv(inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=visual + 1,dilation=visual + 1, relu=False),
-                BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=(3, 3), stride=stride, padding=(1, 1))
+                BasicConv(inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=visual + 1,dilation=visual + 1),
+                BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=(3, 3), stride=stride, padding=(1, 1), relu=False)
 
         )
         self.branch2 = nn.Sequential(
@@ -98,15 +98,15 @@ class BasicRFB_a(nn.Module):
                 BasicConv(inter_planes, inter_planes, kernel_size=(3,1), stride=1, padding=(1,0)),
                 BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=3, dilation=3, relu=False)
                 )
-        self.branch1_2 = nn.Sequential(
-                BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
-                BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=3, dilation=3),
-                BasicConv(inter_planes, inter_planes, kernel_size=(3,1), stride=1, padding=(1,0), relu=False)
-                )
+        # self.branch1_2 = nn.Sequential(
+        #         BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
+        #         BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=3, dilation=3),
+        #         BasicConv(inter_planes, inter_planes, kernel_size=(3,1), stride=1, padding=(1,0), relu=False)
+        #         )
         self.branch2 = nn.Sequential(
-            BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
-            BasicConv(inter_planes, inter_planes, kernel_size=(1, 3), stride=stride, padding=(0, 1)),
-            BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=3, dilation=3, relu=False)
+                BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
+                BasicConv(inter_planes, inter_planes, kernel_size=(1, 3), stride=stride, padding=(0, 1)),
+                BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=3, dilation=3, relu=False)
         )
         self.branch2_2 = nn.Sequential(
                 BasicConv(in_planes, inter_planes, kernel_size=1, stride=1),
@@ -114,10 +114,10 @@ class BasicRFB_a(nn.Module):
                 BasicConv(inter_planes, inter_planes, kernel_size=(1,3), stride=stride, padding=(0,1), relu=False)
                 )
         self.branch3 = nn.Sequential(
-            BasicConv(in_planes, inter_planes // 2, kernel_size=1, stride=1),
-            BasicConv(inter_planes // 2, (inter_planes // 4) * 3, kernel_size=(1, 3), stride=1, padding=(0, 1)),
-            BasicConv((inter_planes // 4) * 3, inter_planes, kernel_size=(3, 1), stride=stride, padding=(1, 0)),
-            BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=5, dilation=5, relu=False)
+                BasicConv(in_planes, inter_planes // 2, kernel_size=1, stride=1),
+                BasicConv(inter_planes // 2, (inter_planes // 4) * 3, kernel_size=(1, 3), stride=1, padding=(0, 1)),
+                BasicConv((inter_planes // 4) * 3, inter_planes, kernel_size=(3, 1), stride=stride, padding=(1, 0)),
+                BasicConv(inter_planes, inter_planes, kernel_size=3, stride=1, padding=5, dilation=5, relu=False)
         )
         self.branch3_2 = nn.Sequential(
                 BasicConv(in_planes, inter_planes//2, kernel_size=1, stride=1),

@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
 # ======================================================================== #
-parser.add_argument('-s', '--size', default='512',
+parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='VOC',
                     help='VOC or COCO dataset')

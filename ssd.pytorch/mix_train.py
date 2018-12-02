@@ -46,7 +46,7 @@ parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
 
 ### decreased the learning rate
-parser.add_argument('--lr', '--learning-rate', default=4e-3, type=float,
+parser.add_argument('--lr', '--learning-rate', default=4e-4, type=float,
                     help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float,
                     help='Momentum value for optim')
@@ -70,8 +70,8 @@ if torch.cuda.is_available():
 else:
     torch.set_default_tensor_type('torch.FloatTensor')
 
-if not os.path.exists(args.save_folder):
-    os.mkdir(args.save_folder)
+# if not os.path.exists(args.save_folder):
+#     os.makedirs(args.save_folder)
 
 writer = None
 lr_sche = None
@@ -164,28 +164,44 @@ def train():
                                   num_workers=args.num_workers,
                                   shuffle=True, collate_fn=detection_collate,
                                   pin_memory=True)
-    stepvalues = (150 , 200 , 250)
+    # stepvalues = (150 , 200 , 250)
+    stepvalues = (80, 100, 120, 140, 160)
 
-    for epoch in range(args.start_iter, 400):
+    for epoch in range(args.start_iter, 160):
         batch_iterator = iter(data_loader)
         loc_loss = 0
         conf_loss = 0
 
         t0 = time.time()
+
+        # ---------------------------------
+        step_index = 0
+        for stepvalue in stepvalues:
+            if epoch >= stepvalue:
+                step_index += 1
+        # ---------------------------------
+
         # sche.step(epoch)
         for iteration in range(epoch_size):
 
+            lr = adjust_learning_rate_wr(optimizer, 0.1, step_index, iteration + (epoch_size * epoch), epoch, epoch_size)
+
             # load train data
             images, targets = next(batch_iterator)
-            if epoch in stepvalues:
-                step_index += 1
-            lr = adjust_learning_rate_wr(optimizer, 0.1, step_index, iteration+(epoch_size*epoch), epoch,epoch_size)
+
+            t1 = targets[0]
+            print(t1)
+
+            # -------------------------------------------------------------------
+            print("# --------------------------------------------------------------");
+            exit(0)
 
             ### mixing
             alpha = 0.1
             lam = np.random.beta(alpha, alpha)
             index = np.arange(len(targets))
             np.random.shuffle(index)
+
 
             if args.cuda:
                 images = Variable(images.cuda())
@@ -215,11 +231,11 @@ def train():
             loss = loss_l + loss_c
             loss.backward()
             optimizer.step()
-            loc_loss += loss_l.data[0]
-            conf_loss += loss_c.data[0]
+            loc_loss += loss_l.data.item()
+            conf_loss += loss_c.data.item()
             lr_now = optimizer.param_groups[0]['lr']
 
-            print('==>Train: Epoch [{}/{}]  '.format(epoch, 400) + 'iter ' + repr(iteration) + '|| loss_l:%.4f | loss_c:%.4f || ' % (loss_l.data[0],loss_c.data[0]) + 'lr={}'.format(lr_now), end='\r')
+            print('==>Train: Epoch [{}/{}]  '.format(epoch, 400) + 'iter ' + repr(iteration) + '|| loss_l:%.4f | loss_c:%.4f || ' % (loss_l.data.item(),loss_c.data.item()) + 'lr={}'.format(lr_now), end='\r')
 
         t1 = time.time()
         print('\nEpoch [{}/{}] '.format(epoch, 400) + 'timer: %.4f sec.' % (t1 - t0) , end='\n')
@@ -234,12 +250,13 @@ def train():
         #     update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
         #                     iter_plot, epoch_plot, 'append')
 
-        if epoch % 10 == 0:
+
+        if epoch % 10 == 0 or epoch > 100 :
             print('Saving state, epoch:', epoch)
             torch.save(ssd_net.state_dict(), log_folder + 'ssd300_' + args.dataset + '_' +
                        repr(epoch) + '.pth')
-        torch.save(ssd_net.state_dict(),
-               args.save_folder + '' + args.dataset + '.pth')
+    torch.save(ssd_net.state_dict(), log_folder + 'ssd300_' + args.dataset + '_' +
+               repr(epoch) + '.pth')
 
 
 def adjust_learning_rate(optimizer, gamma, step):

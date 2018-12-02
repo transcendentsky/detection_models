@@ -9,19 +9,20 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import numpy as np
 from torch.autograd import Variable
-from data import VOCroot,COCOroot 
-from data import AnnotationTransform, COCODetection, VOCDetection, BaseTransform, VOC_300,VOC_512,COCO_300,COCO_512, COCO_mobile_300
 
-import torch.utils.data as data
-from layers.functions import Detect,PriorBox
+home = os.path.expanduser("~")
+COCOroot = os.path.join(home,"data/COCO/")
+
+from data import COCODetection
+
 from utils.nms_wrapper import nms
 from utils.timer import Timer
 
 parser = argparse.ArgumentParser(description='Receptive Field Block Net')
 
-parser.add_argument('-v', '--version', default='RFB_E_vgg',
+parser.add_argument('-v', '--version', default='RFB_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
-parser.add_argument('-s', '--size', default='512',    # 512 / 300
+parser.add_argument('-s', '--size', default='300',
                     help='300 or 512 input size.')
 parser.add_argument('-d', '--dataset', default='COCO',
                     help='VOC or COCO version')
@@ -45,19 +46,7 @@ if args.dataset == 'VOC':
 else:
     cfg = (COCO_300, COCO_512)[args.size == '512']
 
-if args.version == 'RFB_vgg':
-    from models.RFB_Net_vgg import build_net
-elif args.version == 'RFB_E_vgg':
-    from models.RFB_Net_E_vgg import build_net
-elif args.version == "RFB_MNet_vgg":
-    from models.RFB_MNet_vgg import build_net
-elif args.version == "RFB_iou_vgg":
-    from models.RFB_Net_iou_vgg import build_net
-elif args.version == 'RFB_mobile':
-    from models.RFB_Net_mobile import build_net
-    cfg = COCO_mobile_300
-else:
-    print('Unkown version!')
+from ssd import build_ssd
 
 priorbox = PriorBox(cfg)
 with torch.no_grad():
@@ -77,7 +66,6 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
                  for _ in range(num_classes)]
 
     _t = {'im_detect': Timer(), 'misc': Timer()}
-    t_rec = 0
     det_file = os.path.join(save_folder, 'detections.pkl')
 
     if args.retest:
@@ -134,7 +122,6 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
                     all_boxes[j][i] = all_boxes[j][i][keep, :]
 
         nms_time = _t['misc'].toc()
-        t_rec += detect_time + nms_time
 
         if i % 2 == 0:
             print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s'
@@ -142,7 +129,6 @@ def test_net(save_folder, net, detector, cuda, testset, transform, max_per_image
             _t['im_detect'].clear()
             _t['misc'].clear()
 
-    print("Total time: {}, avg time: {}, ".format(t_rec, t_rec/num_images))
     with open(det_file, 'wb') as f:
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
@@ -154,7 +140,7 @@ def test_model(trained_model):
     # load net
     img_dim = (300,512)[args.size=='512']
     num_classes = (21, 81)[args.dataset == 'COCO']
-    net = build_net('test', img_dim, num_classes)    # initialize detector
+    net = build_ssd('test', img_dim, num_classes)    # initialize detector
     state_dict = torch.load(trained_model)
     # create new OrderedDict that does not contain `module.`
 
@@ -171,17 +157,9 @@ def test_model(trained_model):
     net.eval()
     print('Finished loading model!')
     # print(net)
-    # load data
-    if args.dataset == 'VOC':
-        testset = VOCDetection(
-            VOCroot, [('2007', 'test')], None, AnnotationTransform())
-    elif args.dataset == 'VOC2012':
-        testset = VOCDetection(
-            VOCroot, [('2012', 'test')], None, AnnotationTransform())
-    elif args.dataset == 'COCO':
-        testset = COCODetection(
+    testset = COCODetection(
             COCOroot, [('2014', 'minival')], None)
-            # COCOroot, [('2015', 'test-dev')], None)
+            #COCOroot, [('2015', 'test-dev')], None)
     else:
         print('Only VOC and COCO dataset are supported now!')
     if args.cuda:
@@ -189,10 +167,8 @@ def test_model(trained_model):
         cudnn.benchmark = True
     else:
         net = net.cpu()
-
     # evaluation
     #top_k = (300, 200)[args.dataset == 'COCO']
-
     top_k = 200
     detector = Detect(num_classes,0,cfg)
     save_folder = os.path.join(args.save_folder,args.dataset)
@@ -202,17 +178,12 @@ def test_model(trained_model):
              top_k, thresh=0.01)
 
 if __name__ == '__main__':
-    # tt = "weights/RFB_vgg_COCO_30.3.pth"
-    # test_model(tt)
-    tt = "weights/RFB512_E_34_4.pth"
+    tt = "ckpts/RFBNet300_VOC_80_7.pth"
     test_model(tt)
-    # tt = "weights/mixup/coco512E/RFB_E_vgg_COCO_epoches_140.pth"
-    # test_model(tt)
 
-    for i in range(10):
-        fname = "weights/mixup/coco512E/RFB_E_vgg_COCO_epoches_1"+str(35+i)+".pth"
-        # fname = "weights/mixup/cocoRFB_vgg_COCO_epoches_" + str(235-5*i) + ".pth"
-        # fname = "weights/mixup/RFB_vgg_VOC_epoches_2" + str(i) + "0.pth"
+
+    for i in range(24,29):
+        fname = "weights/mixup/RFB_vgg_VOC_epoches_2" + str(i) + "0.pth"
         # "results/mtensor/1001RFB_vgg_VOC_epoches_30.pth"
         print(fname)
         test_model(fname)

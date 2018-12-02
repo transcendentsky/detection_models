@@ -20,17 +20,18 @@ from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(
     description='Receptive Field Block Net Training')
-parser.add_argument('-v', '--version', default='RFB_vgg',
+parser.add_argument('-v', '--version', default='RFB_E_vgg',
                     help='RFB_vgg ,RFB_E_vgg or RFB_mobile version.')
+# ======================================================================== #
 parser.add_argument('-s', '--size', default='512',
                     help='300 or 512 input size.')
-parser.add_argument('-d', '--dataset', default='VOC',
+parser.add_argument('-d', '--dataset', default='COCO',
                     help='VOC or COCO dataset')
 parser.add_argument(
     '--basenet', default='./weights/vgg16_reducedfc2.pth', help='pretrained base model')
 parser.add_argument('--jaccard_threshold', default=0.5,
                     type=float, help='Min Jaccard index for matching')
-parser.add_argument('-b', '--batch_size', default=32,
+parser.add_argument('-b', '--batch_size', default=8,
                     type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=8,
                     type=int, help='Number of workers used in dataloading')
@@ -38,12 +39,16 @@ parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
 parser.add_argument('--ngpu', default=1, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
-                    default=4e-3, type=float, help='initial learning rate')
+                    default=2e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument(
-    '--resume_net', default=None, help='resume net for retraining')
-parser.add_argument('--resume_epoch', default=0,
+# ========================================================================= #
+parser.add_argument('--resume_net', default="weights/mixup/coco512E/RFB_E_vgg_COCO_epoches_135.pth",
+                    help='resume net for retraining')
+# "ckpts/RFBNet300_VOC_80_7.pth"
+# "weights/RFB_vgg_COCO_30.3.pth"
+parser.add_argument('--resume_epoch', default=135,
                     type=int, help='resume iter for retraining')
+
 parser.add_argument('-max', '--max_epoch', default=300,
                     type=int, help='max epoch for retraining')
 parser.add_argument('--weight_decay', default=5e-4,
@@ -52,20 +57,18 @@ parser.add_argument('--gamma', default=0.1,
                     type=float, help='Gamma update for SGD')
 parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
-# ===================================================================================
-parser.add_argument('--save_folder', default='./results/512/standard',
+parser.add_argument('--save_folder', default='./weights/mixup/coco512E/',
                     help='Location to save checkpoint models')
-# ===================================================================================
 args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
-    os.makedirs(args.save_folder)
+    os.mkdir(args.save_folder)
 
 if args.dataset == 'VOC':
     train_sets = [('2007', 'trainval'), ('2012', 'trainval')]
     cfg = (VOC_300, VOC_512)[args.size == '512']
 else:
-    train_sets = [('2014', 'train'), ('2014', 'valminusminival')]
+    train_sets = [('2014', 'train'), ('2014', 'valminusminival')] #
     cfg = (COCO_300, COCO_512)[args.size == '512']
 
 if args.version == 'RFB_vgg':
@@ -98,7 +101,7 @@ if args.resume_net == None:
 
 
     def xavier(param):
-        init.xavier_uniform(param)
+        init.xavier_uniform_(param)
 
 
     def weights_init(m):
@@ -124,7 +127,7 @@ if args.resume_net == None:
 
 else:
     # load resume network
-    print('Loading resume network...')
+    print('Loading resume network... {}'.format(args.resume_net))
     state_dict = torch.load(args.resume_net)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
@@ -181,7 +184,11 @@ def train():
     max_iter = args.max_epoch * epoch_size
 
     stepvalues_VOC = (150 * epoch_size, 200 * epoch_size, 250 * epoch_size)
-    stepvalues_COCO = (90 * epoch_size, 120 * epoch_size, 140 * epoch_size)
+    stepvalues_COCO = (90 * epoch_size, 120 * epoch_size, 140 * epoch_size, 215*epoch_size)
+    if args.size == '512' and args.batch_size < 32:
+        # batchsize => 8
+        stepvalues_COCO = (90 * epoch_size, 120 * epoch_size, 140 * epoch_size, 215 * epoch_size)
+        print("!!!!!!!!!")
     stepvalues = (stepvalues_VOC, stepvalues_COCO)[args.dataset == 'COCO']
     print('Training', args.version, 'on', dataset.name)
     step_index = 0
@@ -192,32 +199,35 @@ def train():
         start_iter = 0
 
     lr = args.lr
+    loc_loss = 0
+    conf_loss = 0
     for iteration in range(start_iter, max_iter):
         if iteration % epoch_size == 0:
-            # Save logs
-            writer.add_scalar("conf_loss", conf_loss / epoch_size, epoch)
-            writer.add_scalar("loc_loss", loc_loss / epoch_size, epoch)
-            writer.add_scalar("learning rate", lr, epoch)
-            print("Epoch size: {}".format(epoch_size))
-
             # create batch iterator
             batch_iterator = iter(data.DataLoader(dataset, batch_size,
                                                   shuffle=True, num_workers=args.num_workers,
                                                   collate_fn=detection_collate))
             loc_loss = 0
             conf_loss = 0
-            if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > 200):
+            if (epoch % 10 == 0 and epoch > 0) or (epoch % 1 == 0 and epoch > 90):
                 torch.save(net.state_dict(), args.save_folder + args.version + '_' + args.dataset + '_epoches_' +
                            repr(epoch) + '.pth')
             epoch += 1
 
+
         load_t0 = time.time()
-        if iteration in stepvalues:
-            step_index += 1
+        step_index = 0
+        for stepvalue in stepvalues:
+            if iteration >= stepvalue:
+                step_index += 1
         lr = adjust_learning_rate(optimizer, args.gamma, epoch, step_index, iteration, epoch_size)
 
-        # load train data
         images, targets = next(batch_iterator)
+        # load train data
+        lam = np.random.beta(0.1, 0.1)
+        ##  mixup
+        index = np.arange(len(targets))
+        np.random.shuffle(index)
 
         # print(np.sum([torch.sum(anno[:,-1] == 2) for anno in targets]))
 
@@ -227,12 +237,23 @@ def train():
         else:
             images = Variable(images)
             targets = [Variable(anno) for anno in targets]
+        mixed_x = lam * images + (1 - lam) * images[index, :]
+        y_a = targets
+        y_b = [targets[idx] for idx in index]
+
         # forward
         t0 = time.time()
-        out = net(images)
+        out = net(mixed_x)
         # backprop
         optimizer.zero_grad()
-        loss_l, loss_c = criterion(out, priors, targets)
+        # loss_l, loss_c = criterion(out, priors, targets)
+
+        loss_l1, loss_c1 = criterion(out,priors, y_a)
+        loss_l2, loss_c2 = criterion(out,priors, y_b)
+
+        loss_l = lam * loss_l1 + (1 - lam) * loss_l2
+        loss_c = lam * loss_c1 + (1 - lam) * loss_c2
+
         loss = loss_l + loss_c
         loss.backward()
         optimizer.step()
@@ -246,6 +267,11 @@ def train():
                   repr(iteration) + ' || L: %.4f C: %.4f||' % (
                       loss_l.item(), loss_c.item()) +
                   'Batch time: %.4f sec. ||' % (load_t1 - load_t0) + 'LR: %.8f' % (lr))
+        if iteration % epoch_size == 0:
+            # Summary
+            writer.add_scalar("conf_loss", conf_loss, iteration//epoch_size)
+            writer.add_scalar("loc_loss", loc_loss, iteration//epoch_size)
+            writer.add_scalar("learning rate", lr, iteration//epoch_size)
 
     torch.save(net.state_dict(), args.save_folder +
                'Final_' + args.version + '_' + args.dataset + '.pth')

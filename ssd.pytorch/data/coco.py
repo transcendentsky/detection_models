@@ -83,8 +83,11 @@ class COCODetection(data.Dataset):
         in the target (bbox) and transforms it.
     """
 
-    def __init__(self, root, image_set='trainval35k', transform=None,
-                 target_transform=COCOAnnotationTransform(), dataset_name='MS COCO'):
+    def __init__(self, root,
+                 image_set='trainval35k',
+                 transform=None,
+                 target_transform=COCOAnnotationTransform(),
+                 dataset_name='MS COCO'):
         sys.path.append(osp.join(root, COCO_API))
         from pycocotools.coco import COCO
         self.root = osp.join(root, IMAGES, image_set)
@@ -94,6 +97,10 @@ class COCODetection(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.name = dataset_name
+
+        self.cates = []
+
+        print("#----------#\n[DEBUG] : ", self.ids[:20])
 
     def __getitem__(self, index):
         """
@@ -122,6 +129,13 @@ class COCODetection(data.Dataset):
         ann_ids = self.coco.getAnnIds(imgIds=img_id)
 
         target = self.coco.loadAnns(ann_ids)
+
+        print("@@ ----------------------------------- target")
+        for t in target:
+            if t['category_id'] not in self.cates and t['category_id'] > 80:
+                self.cates.append(t['category_id'])
+        print(self.cates)
+
         path = osp.join(self.root, self.coco.loadImgs(img_id)[0]['file_name'])
         assert osp.exists(path), 'Image path does not exist: {}'.format(path)
         img = cv2.imread(osp.join(self.root, path))
